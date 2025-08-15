@@ -7,6 +7,19 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(express.json());
 
+// CORS middleware for cross-origin requests
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 // MongoDB connection
 const connectDB = async () => {
   try {
@@ -46,15 +59,49 @@ const codeSchema = new mongoose.Schema({
 
 const Code = mongoose.model('Code', codeSchema);
 
-// Routes
+// Root route
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Code Storage API',
+    version: '1.0.0',
+    endpoints: {
+      'GET /api/codes': 'Get all code snippets',
+      'GET /api/codes/:id': 'Get code snippet by ID',
+      'POST /api/codes': 'Create new code snippet',
+      'PUT /api/codes/:id': 'Update code snippet',
+      'DELETE /api/codes/:id': 'Delete code snippet',
+      'GET /health': 'Health check'
+    }
+  });
+});
+
+// Health check
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    message: 'Code Storage API is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// API Routes
 
 // GET all code snippets
 app.get('/api/codes', async (req, res) => {
   try {
     const codes = await Code.find().sort({ createdAt: -1 });
-    res.json(codes);
+    res.status(200).json({
+      success: true,
+      count: codes.length,
+      data: codes
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching codes:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch codes',
+      message: error.message 
+    });
   }
 });
 
@@ -63,27 +110,57 @@ app.get('/api/codes/:id', async (req, res) => {
   try {
     const code = await Code.findById(req.params.id);
     if (!code) {
-      return res.status(404).json({ error: 'Code not found' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Code snippet not found' 
+      });
     }
-    res.json(code);
+    res.status(200).json({
+      success: true,
+      data: code
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching code:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch code',
+      message: error.message 
+    });
   }
 });
 
 // POST new code snippet
 app.post('/api/codes', async (req, res) => {
   try {
-    const {code } = req.body;
+    const { title, code, language } = req.body;
+    
+    // Validation
+    if (!title || !code) {
+      return res.status(400).json({
+        success: false,
+        error: 'Title and code are required fields'
+      });
+    }
     
     const newCode = new Code({
+      title,
       code,
+      language: language || 'javascript'
     });
     
     const savedCode = await newCode.save();
-    res.status(201).json(savedCode);
+    res.status(201).json({
+      success: true,
+      message: 'Code snippet created successfully',
+      data: savedCode
+    });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    console.error('Error creating code:', error);
+    res.status(400).json({ 
+      success: false,
+      error: 'Failed to create code',
+      message: error.message 
+    });
   }
 });
 
@@ -94,17 +171,33 @@ app.put('/api/codes/:id', async (req, res) => {
     
     const updatedCode = await Code.findByIdAndUpdate(
       req.params.id,
-      { title, code, language },
+      { 
+        ...(title && { title }),
+        ...(code && { code }),
+        ...(language && { language })
+      },
       { new: true, runValidators: true }
     );
     
     if (!updatedCode) {
-      return res.status(404).json({ error: 'Code not found' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Code snippet not found' 
+      });
     }
     
-    res.json(updatedCode);
+    res.status(200).json({
+      success: true,
+      message: 'Code snippet updated successfully',
+      data: updatedCode
+    });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    console.error('Error updating code:', error);
+    res.status(400).json({ 
+      success: false,
+      error: 'Failed to update code',
+      message: error.message 
+    });
   }
 });
 
@@ -114,34 +207,51 @@ app.delete('/api/codes/:id', async (req, res) => {
     const deletedCode = await Code.findByIdAndDelete(req.params.id);
     
     if (!deletedCode) {
-      return res.status(404).json({ error: 'Code not found' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Code snippet not found' 
+      });
     }
     
-    res.json({ message: 'Code deleted successfully' });
+    res.status(200).json({ 
+      success: true,
+      message: 'Code snippet deleted successfully',
+      data: deletedCode
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error deleting code:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to delete code',
+      message: error.message 
+    });
   }
-});
-
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Code Storage API is running' });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  console.error('Unhandled error:', err.stack);
+  res.status(500).json({ 
+    success: false,
+    error: 'Internal server error',
+    message: 'Something went wrong!'
+  });
 });
 
-// 404 handler - Fixed the problematic route pattern
-app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
+// 404 handler - Must be last
+app.use('*', (req, res) => {
+  res.status(404).json({ 
+    success: false,
+    error: 'Route not found',
+    message: `Cannot ${req.method} ${req.originalUrl}`
+  });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Start server only if not in production (Vercel handles this)
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
 
 module.exports = app;
