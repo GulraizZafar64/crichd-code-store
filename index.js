@@ -82,11 +82,11 @@ app.post('/api/codes', async (req, res) => {
 // PUT update code snippet
 app.put('/api/codes/:id', async (req, res) => {
   try {
-    const { title, code, language } = req.body;
+    const {code } = req.body;
     
     const updatedCode = await Code.findByIdAndUpdate(
       req.params.id,
-      { title, code, language },
+      {code },
       { new: true, runValidators: true }
     );
     
