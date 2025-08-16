@@ -83,7 +83,7 @@ app.get('/api/codes/:id', async (req, res) => {
 // POST new code snippet
 app.post('/api/codes', async (req, res) => {
   try {
-    const {code } = req.body;
+    const {code} = req.body;
     
     const newCode = new Code({
       code,
@@ -103,7 +103,7 @@ app.put('/api/codes/:id', async (req, res) => {
     
     const updatedCode = await Code.findByIdAndUpdate(
       req.params.id,
-      {code },
+      {code},
       { new: true, runValidators: true }
     );
     
