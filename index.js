@@ -8,18 +8,35 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 // MongoDB connection
+// MongoDB connection with better error handling
 const connectDB = async () => {
   try {
-    await mongoose.connect('mongodb+srv://gulraizzafar77:OshnKGJUm8E9YmLV@cluster0.pr5kytk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', {
+    const conn = await mongoose.connect('mongodb+srv://gulraizzafar77:OshnKGJUm8E9YmLV@cluster0.pr5kytk.mongodb.net/codestore?retryWrites=true&w=majority&appName=Cluster0', {
       useNewUrlParser: true,
       useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
     });
-    console.log('MongoDB connected successfully with Mongoose');
+    
+    console.log(`MongoDB connected: ${conn.connection.host}`);
   } catch (error) {
     console.error('MongoDB connection error:', error);
     process.exit(1);
   }
 };
+
+// Handle connection events
+mongoose.connection.on('connected', () => {
+  console.log('Mongoose connected to MongoDB');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('Mongoose connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('Mongoose disconnected');
+});
 
 // Connect to database
 connectDB();
